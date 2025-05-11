@@ -15,6 +15,7 @@ const StudentForm = () => {
   const [csvFile, setCsvFile] = useState(null);
   const [isBulkUpload, setIsBulkUpload] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [vaccinations, setVaccinations] = useState([]);
   const navigate = useNavigate();
   const { id } = useParams();
 
@@ -24,12 +25,20 @@ const StudentForm = () => {
       const fetchStudent = async () => {
         try {
           const token = localStorage.getItem('token');
-          const response = await fetch(`http://localhost:5000/schools/1/students/${id}`, {
+          const response = await fetch(`http://localhost:5000/schools/1/students/${id}?include_vaccinations=true`, {
             headers: { 'Authorization': token },
           });
           if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
           const data = await response.json();
-          setFormData(data);
+          setFormData({
+            first_name: data.first_name,
+            last_name: data.last_name,
+            date_of_birth: data.date_of_birth,
+            gender: data.gender,
+            contact_number: data.contact_number,
+            student_class: data.student_class
+          });
+          setVaccinations(data.vaccinations || []);
         } catch (err) {
           setError(err);
         } finally {
@@ -117,105 +126,175 @@ const StudentForm = () => {
     }
   };
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error.message}</div>;
+  if (loading) return <div className="p-4">Loading...</div>;
+  if (error) return <div className="p-4 text-red-500">Error: {error.message}</div>;
 
   return (
-    <div className="container">
-      <h2>{id ? (isBulkUpload ? 'Bulk Import Students' : 'Edit Student') : 'Add Student'}</h2>
+    <div className="container mx-auto p-4 max-w-4xl">
+      <h2 className="text-2xl font-bold mb-6">
+        {id ? (isBulkUpload ? 'Bulk Import Students' : 'Edit Student') : 'Add Student'}
+      </h2>
       
       {isBulkUpload ? (
-        <form onSubmit={handleBulkUpload}>
-          <div className="form-group">
-            <label>CSV File:</label>
-            <input type="file" accept=".csv" onChange={handleFileChange} required />
-            <small>CSV format: first_name,last_name,date_of_birth,gender,contact_number,student_class</small>
+        <form onSubmit={handleBulkUpload} className="bg-white rounded-lg shadow-md p-6">
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">CSV File</label>
+            <input 
+              type="file" 
+              accept=".csv" 
+              onChange={handleFileChange} 
+              className="block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-md file:border-0
+                file:text-sm file:font-semibold
+                file:bg-blue-50 file:text-blue-700
+                hover:file:bg-blue-100"
+              required
+            />
+            <p className="mt-1 text-sm text-gray-500">
+              CSV format: first_name,last_name,date_of_birth,gender,contact_number,student_class
+            </p>
           </div>
-          <button type="submit" className="btn btn-primary">
-            Upload CSV
-          </button>
-          {uploadProgress > 0 && (
-            <div className="progress mt-3">
-              <div
-                className="progress-bar"
-                role="progressbar"
-                style={{ width: `${uploadProgress}%` }}
-                aria-valuenow={uploadProgress}
-                aria-valuemin="0"
-                aria-valuemax="100"
-              >
-                {uploadProgress}%
-              </div>
-            </div>
-          )}
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={() => navigate('/students')}
+              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Upload CSV
+            </button>
+          </div>
         </form>
       ) : (
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>First Name:</label>
-            <input
-              type="text"
-              name="first_name"
-              value={formData.first_name}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label>Last Name:</label>
-            <input
-              type="text"
-              name="last_name"
-              value={formData.last_name}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label>Date of Birth:</label>
-            <input
-              type="date"
-              name="date_of_birth"
-              value={formData.date_of_birth}
-              onChange={handleChange}
-            />
-          </div>
-          <div className="form-group">
-            <label>Gender:</label>
-            <select
-              name="gender"
-              value={formData.gender}
-              onChange={handleChange}
-            >
-              <option value="">Select</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Contact Number:</label>
-            <input
-              type="text"
-              name="contact_number"
-              value={formData.contact_number}
-              onChange={handleChange}
-            />
-          </div>
-          <div className="form-group">
-            <label>Class:</label>
-            <input
-              type="text"
-              name="student_class"
-              value={formData.student_class}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <button type="submit" className="btn btn-primary">
-            {id ? 'Update Student' : 'Add Student'}
-          </button>
-        </form>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                <input
+                  type="text"
+                  name="first_name"
+                  value={formData.first_name}
+                  onChange={handleChange}
+                  className="w-full p-2 border border-gray-300 rounded"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                <input
+                  type="text"
+                  name="last_name"
+                  value={formData.last_name}
+                  onChange={handleChange}
+                  className="w-full p-2 border border-gray-300 rounded"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+                <input
+                  type="date"
+                  name="date_of_birth"
+                  value={formData.date_of_birth}
+                  onChange={handleChange}
+                  className="w-full p-2 border border-gray-300 rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                <select
+                  name="gender"
+                  value={formData.gender}
+                  onChange={handleChange}
+                  className="w-full p-2 border border-gray-300 rounded"
+                >
+                  <option value="">Select</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Number</label>
+                <input
+                  type="text"
+                  name="contact_number"
+                  value={formData.contact_number}
+                  onChange={handleChange}
+                  className="w-full p-2 border border-gray-300 rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Class</label>
+                <input
+                  type="text"
+                  name="student_class"
+                  value={formData.student_class}
+                  onChange={handleChange}
+                  className="w-full p-2 border border-gray-300 rounded"
+                  required
+                />
+              </div>
+            </div>
+
+            {id && vaccinations.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Vaccination Records</h3>
+                <div className="bg-gray-50 p-4 rounded">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead>
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vaccine</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vaccinations.map(v => (
+                        <tr key={v.vaccination_id}>
+                          <td className="px-4 py-2 whitespace-nowrap">{v.vaccine_name}</td>
+                          <td className="px-4 py-2 whitespace-nowrap">
+                            {new Date(v.vaccination_date).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              v.vaccinated_status ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {v.vaccinated_status ? 'Completed' : 'Pending'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => navigate('/students')}
+                className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                {id ? 'Update Student' : 'Add Student'}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </div>
   );

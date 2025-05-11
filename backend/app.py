@@ -464,7 +464,7 @@ def manage_vaccination_drives(school_id):
         }), 201
 
 
-@app.route('/schools/<int:school_id>/students/<int:student_id>/vaccinate', methods=['POST'])
+"""@app.route('/schools/<int:school_id>/students/<int:student_id>/vaccinate', methods=['POST'])
 def mark_vaccinated(school_id, student_id):
     if request.method == 'OPTIONS':
         return _build_cors_preflight_response()
@@ -505,6 +505,95 @@ def mark_vaccinated(school_id, student_id):
         'vaccination_id': vaccination.vaccination_id,
         'student_id': vaccination.student_id,
         'vaccine_name': vaccination.vaccine_name
+    }), 201 """
+
+@app.route('/schools/<int:school_id>/students/<int:student_id>/vaccinations', methods=['GET'])
+def get_student_vaccinations(school_id, student_id):
+    if request.method == 'OPTIONS':
+        return _build_cors_preflight_response()
+    if not is_authorized(request):
+        return jsonify({'message': 'Unauthorized'}), 401
+    
+    student = Student.query.filter_by(school_id=school_id, student_id=student_id).first()
+    if not student:
+        return jsonify({'message': 'Student not found'}), 404
+    
+    vaccinations = Vaccination.query.filter_by(student_id=student_id).all()
+    vaccination_list = [{
+        'vaccination_id': v.vaccination_id,
+        'drive_id': v.drive_id,
+        'vaccine_name': v.vaccine_name,
+        'vaccination_date': v.vaccination_date.isoformat(),
+        'vaccinated_status': v.vaccinated_status
+    } for v in vaccinations]
+    
+    return jsonify(vaccination_list)
+
+@app.route('/schools/<int:school_id>/students/<int:student_id>/vaccinate', methods=['POST'])
+def mark_vaccinated(school_id, student_id):
+    if request.method == 'OPTIONS':
+        return _build_cors_preflight_response()
+    if not is_authorized(request):
+        return jsonify({'message': 'Unauthorized'}), 401
+    
+    data = request.get_json()
+    drive_id = data.get('drive_id')
+    
+    if not drive_id:
+        return jsonify({'message': 'Drive ID is required'}), 400
+    
+    # Verify student and drive belong to the same school
+    student = Student.query.filter_by(school_id=school_id, student_id=student_id).first()
+    drive = VaccinationDrive.query.filter_by(school_id=school_id, drive_id=drive_id).first()
+    
+    if not student:
+        return jsonify({'message': 'Student not found'}), 404
+    if not drive:
+        return jsonify({'message': 'Vaccination drive not found'}), 404
+    
+    # Check if student is already vaccinated with this vaccine
+    existing = Vaccination.query.filter_by(
+        student_id=student_id,
+        vaccine_name=drive.vaccine_name
+    ).first()
+    
+    if existing:
+        return jsonify({
+            'message': f'Student already vaccinated with {drive.vaccine_name}',
+            'existing_vaccination': {
+                'vaccination_id': existing.vaccination_id,
+                'drive_id': existing.drive_id,
+                'date': existing.vaccination_date.isoformat()
+            }
+        }), 400
+    
+    # Check if student's class is applicable for this drive
+    if drive.applicable_classes and student.student_class not in drive.applicable_classes.split(','):
+        return jsonify({
+            'message': f'Student class {student.student_class} not eligible for this drive'
+        }), 400
+    
+    # Create vaccination record
+    vaccination = Vaccination(
+        student_id=student_id,
+        drive_id=drive_id,
+        vaccine_name=drive.vaccine_name,
+        vaccinated_status=True,
+        vaccination_date=datetime.utcnow().date()
+    )
+    
+    db.session.add(vaccination)
+    db.session.commit()
+    
+    return jsonify({
+        'message': 'Vaccination recorded successfully',
+        'vaccination': {
+            'vaccination_id': vaccination.vaccination_id,
+            'student_id': vaccination.student_id,
+            'drive_id': vaccination.drive_id,
+            'vaccine_name': vaccination.vaccine_name,
+            'date': vaccination.vaccination_date.isoformat()
+        }
     }), 201
 
 if __name__ == '__main__':
