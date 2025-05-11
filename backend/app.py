@@ -5,10 +5,23 @@ from datetime import datetime
 from sqlalchemy import func
 import csv
 from io import StringIO
+from flask_cors import CORS
+import timedelta
+from datetime import datetime, timezone
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 app = Flask(__name__)
 app.config.from_object('config')  # Load configuration
 db = SQLAlchemy(app)
+CORS(app, resources={
+    r"/*": {
+        "origins": ["http://localhost:3000"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
+
 #from models import School, Student, VaccinationDrive, Vaccinations # Import your models
 
 class School(db.Model):
@@ -42,6 +55,75 @@ class Vaccinations(db.Model):
     vaccine_name = db.Column(db.String(255), nullable=False)
     vaccination_date = db.Column(db.Date, nullable=False)
     vaccinated_status = db.Column(db.Boolean, default=False)
+
+def _build_cors_preflight_response():
+    response = jsonify({"message": "Preflight accepted"})
+    response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+    response.headers.add("Access-Control-Allow-Headers", "*")
+    response.headers.add("Access-Control-Allow-Methods", "*")
+    return response
+
+def get_dashboard_data_count(school_id):
+
+    try:
+        with app.app_context():  # Ensure we have an application context
+            # 1. Total Number of Students in the School
+            total_students = Student.query.filter(Student.school_id == school_id).count()
+
+            # 2. Number of Vaccinated Students
+            vaccinated_students = db.session.query(Vaccinations.student_id.distinct().label('student_id'))\
+                .join(Student, Student.school_id == Vaccinations.student_id)\
+                .filter(Student.school_id == school_id)\
+                .count()
+            
+            """vaccinated_students = db.session.query(Vaccinations.vaccinated_status == 1)\
+                .filter(Student.school_id == school_id)\
+                .count()"""
+
+            # 3. Percentage of Vaccinated Students
+            vaccinated_percentage = (vaccinated_students / total_students) * 100 if total_students else 0
+            print(vaccinated_percentage)
+
+            # 4. Upcoming Vaccination Drives (within the next 30 days)
+            #today = datetime.utcnow().date()
+            #today = datetime.now(timezone.utc).date()
+            #future_date = today + timedelta(days=30)
+            today = datetime.now().date()
+            future_date = today + relativedelta(days=30)
+            upcoming_drives = VaccinationDrive.query.filter(
+                VaccinationDrive.school_id == school_id,
+                VaccinationDrive.drive_date >= today,
+                VaccinationDrive.drive_date <= future_date
+            ).all()  # Fetch all upcoming drives
+
+            print(today)
+            print(future_date)
+            print(upcoming_drives)
+
+            # Convert the drives to a serializable format (list of dictionaries)
+            upcoming_drives_data = [
+                {
+                    'drive_id': drive.drive_id,
+                    'drive_date': drive.drive_date,
+                    'vaccine_name': drive.vaccine_name
+                    # Add other drive details as needed
+                }
+                for drive in upcoming_drives
+            ]
+
+            # Construct the result dictionary
+            dashboard_data = {
+                'total_students': total_students,
+                'vaccinated_students': vaccinated_students,
+                'vaccinated_percentage': vaccinated_percentage,
+                'upcoming_drives': upcoming_drives_data,
+            }
+            return dashboard_data
+
+    except Exception as e:
+        print(f"Error in get_dashboard_data: {e}")  # Log the error
+        return None
+
 # ...
 # Simplified "authentication"
 # Simplified "authentication"
@@ -51,19 +133,39 @@ def is_authorized(request):
     token = request.headers.get('Authorization')
     return token == AUTHORIZED_TOKEN
 
+
+
 @app.route('/login', methods=['POST'])
 def login():
     # ...
-    return jsonify({'token': AUTHORIZED_TOKEN})
+    if request.method == 'OPTIONS':
+        return _build_cors_preflight_response()
+    else:
+        return jsonify({'token': AUTHORIZED_TOKEN})
 
 @app.route('/schools/<int:school_id>/dashboard', methods=['GET'])
 def get_dashboard_data(school_id):
-    if not is_authorized(request):
-        return jsonify({'message': 'Unauthorized'}), 401
+    if request.method == 'OPTIONS':
+        return _build_cors_preflight_response()
+    elif request.method == 'GET':
+        if not is_authorized(request):
+            return jsonify({'message': 'Unauthorized'}), 401
+        else:
+        
+            dashboard_data = get_dashboard_data_count(school_id)
+            if dashboard_data:
+                return jsonify(dashboard_data), 200
+            else:
+                return jsonify({'error': 'Failed to retrieve dashboard data'}), 500
+            return dashboard_data
+            #return  jsonify({'message': 'Okay'}), 200           
+            
     # ... (as in the previous detailed response)
 
 @app.route('/schools', methods=['GET', 'POST'])
 def manage_schools():
+    if request.method == 'OPTIONS':
+        return _build_cors_preflight_response()
     if not is_authorized(request):
         return jsonify({'message': 'Unauthorized'}), 401
     if request.method == 'GET':
@@ -79,6 +181,8 @@ def manage_schools():
 
 @app.route('/schools/<int:school_id>/students', methods=['GET', 'POST'])
 def manage_students(school_id):
+    if request.method == 'OPTIONS':
+        return _build_cors_preflight_response()
     if not is_authorized(request):
         return jsonify({'message': 'Unauthorized'}), 401
 
@@ -88,13 +192,91 @@ def manage_students(school_id):
         return jsonify(student_list)
     elif request.method == 'POST':
         data = request.get_json()
-        new_student = Student(school_id=school_id, first_name=data['first_name'], last_name=data['last_name'], date_of_birth=datetime.strptime(data['date_of_birth'], '%Y-%m-%d').date(), gender=data['gender'], contact_number=data['contact_number'])
+        new_student = Student(school_id=school_id, first_name=data['first_name'], last_name=data['last_name'])#, date_of_birth=datetime.strptime(data['date_of_birth'], '%Y-%m-%d').date(), gender=data['gender'], contact_number=data['contact_number'])
         db.session.add(new_student)
         db.session.commit()
         return jsonify({'message': 'Student added'}), 201
+    """elif request.method == 'PUT':
+        student = Student.query.filter(Student.school_id == school_id, Student.id == student_id).first()
+        if student:
+            data = request.get_json()
+            # Update student attributes based on the data received.  Include validation.
+            if 'first_name' in data:
+                student.first_name = data['first_name']
+            if 'last_name' in data:
+                student.last_name = data['last_name']
+            if 'date_of_birth' in data:
+                student.date_of_birth = datetime.strptime(data['date_of_birth'], '%Y-%m-%d').date() #handle the date format
+            if 'gender' in data:
+                student.gender = data['gender']
+            if 'contact_number' in data:
+                student.contact_number = data['contact_number']
+            # ... update other fields as necessary
+
+            db.session.commit()
+            return jsonify({
+                'id': student.id,
+                'first_name': student.first_name,
+                'last_name': student.last_name,
+                'date_of_birth': student.date_of_birth.isoformat(),
+                'gender': student.gender,
+                'contact_number': student.contact_number
+            })  # Return the updated student data
+        else:
+            return jsonify({'error': 'Student not found'}), 404"""
+    
+@app.route('/schools/<int:school_id>/students/<int:student_id>', methods=['PUT','GET'])
+def update_student(school_id, student_id):
+    try:
+        student = Student.query.filter(Student.school_id == school_id, Student.student_id == student_id).first()
+        print(student)
+        if request.method == 'OPTIONS':
+            return _build_cors_preflight_response()
+        elif request.method == 'GET':
+            return jsonify({
+                'id': student.student_id,
+                'first_name': student.first_name,
+                'last_name': student.last_name,
+                #'date_of_birth': student.date_of_birth.isoformat(),
+                #'gender': student.gender,
+                #'contact_number': student.contact_number
+            })
+        elif request.method == 'PUT':
+            if student:
+                data = request.get_json()
+                # Update student attributes based on the data received.  Include validation.
+                if 'first_name' in data:
+                    student.first_name = data['first_name']
+                if 'last_name' in data:
+                    student.last_name = data['last_name']
+                if 'date_of_birth' in data:
+                    student.date_of_birth = datetime.strptime(data['date_of_birth'], '%Y-%m-%d').date() #handle the date format
+                if 'gender' in data:
+                    student.gender = data['gender']
+                if 'contact_number' in data:
+                    student.contact_number = data['contact_number']
+                # ... update other fields as necessary
+
+                db.session.commit()
+                return jsonify({
+                    'id': student.student_id,
+                    'first_name': student.first_name,
+                    'last_name': student.last_name,
+                    'date_of_birth': student.date_of_birth.isoformat(),
+                    'gender': student.gender,
+                    'contact_number': student.contact_number
+                })  # Return the updated student data
+            else:
+                return jsonify({'error': 'Student not found'}), 404
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating student: {e}")
+        return jsonify({'error': 'Failed to update student'}), 500
 
 @app.route('/schools/<int:school_id>/students/bulk', methods=['POST'])
 def bulk_upload_students(school_id):
+    if request.method == 'OPTIONS':
+        return _build_cors_preflight_response()
     if not is_authorized(request):
         return jsonify({'message': 'Unauthorized'}), 401
 
@@ -130,6 +312,8 @@ def bulk_upload_students(school_id):
 
 @app.route('/schools/<int:school_id>/vaccination_drives', methods=['GET', 'POST'])
 def manage_vaccination_drives(school_id):
+    if request.method == 'OPTIONS':
+        return _build_cors_preflight_response()
     if not is_authorized(request):
         return jsonify({'message': 'Unauthorized'}), 401
 
@@ -144,9 +328,10 @@ def manage_vaccination_drives(school_id):
         db.session.commit()
         return jsonify({'message': 'Vaccination drive added'}), 201
 
-
 @app.route('/schools/<int:school_id>/vaccinations', methods=['GET', 'POST'])
 def manage_vaccinations(school_id):
+    if request.method == 'OPTIONS':
+        return _build_cors_preflight_response()
     if not is_authorized(request):
         return jsonify({'message': 'Unauthorized'}), 401
 
@@ -190,5 +375,5 @@ def manage_vaccinations(school_id):
 if __name__ == '__main__':
     with app.app_context(): #push context
         db.create_all()  # Create tables if they don't exist
-    app.run(debug=True)
+    app.run(debug=True,host='localhost',port=5000)
 

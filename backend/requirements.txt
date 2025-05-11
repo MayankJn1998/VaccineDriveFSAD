@@ -1,8 +1,7 @@
 mysqlclient
-mariadb
-asyncmy
+#mariadb
+#asyncmy
 pymysql
 mysql-connector-python
-sqlalchemy 
 flask 
 flask-sqlalchemy

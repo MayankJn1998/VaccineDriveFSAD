@@ -8,15 +8,18 @@ const StudentList = () => {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    // Simulate fetching students from an API
-    const fetchData = async () => {
+    const fetchStudents = async () => {
       try {
-        await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate delay
-        const data = [
-          { id: 1, name: 'John Doe', class: '10A', studentId: 'S001', vaccinationStatus: 'Vaccinated' },
-          { id: 2, name: 'Jane Smith', class: '10B', studentId: 'S002', vaccinationStatus: 'Not Vaccinated' },
-          { id: 3, name: 'Bob Johnson', class: '11A', studentId: 'S003', vaccinationStatus: 'Vaccinated' },
-        ];
+        const token = localStorage.getItem('token');
+        const response = await fetch('http://localhost:5000/schools/1/students', { // Assuming school ID 1
+          headers: {
+            'Authorization': token,
+          },
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
         setStudents(data);
       } catch (err) {
         setError(err);
@@ -24,14 +27,14 @@ const StudentList = () => {
         setLoading(false);
       }
     };
-    fetchData();
+
+    fetchStudents();
   }, []);
 
   const filteredStudents = students.filter(student =>
-    student.name.toLowerCase().includes(search.toLowerCase()) ||
-    student.class.toLowerCase().includes(search.toLowerCase()) ||
-    student.studentId.toLowerCase().includes(search.toLowerCase()) ||
-    student.vaccinationStatus.toLowerCase().includes(search.toLowerCase())
+    student.first_name.toLowerCase().includes(search.toLowerCase()) ||
+    student.last_name.toLowerCase().includes(search.toLowerCase()) ||
+    (student.student_id && student.student_id.toString().includes(search)) // Assuming student_id is a number or string
   );
 
   if (loading) {
@@ -55,21 +58,15 @@ const StudentList = () => {
         <thead>
           <tr>
             <th>Name</th>
-            <th>Class</th>
-            <th>Student ID</th>
-            <th>Vaccination Status</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {filteredStudents.map((student) => (
-            <tr key={student.id}>
-              <td>{student.name}</td>
-              <td>{student.class}</td>
-              <td>{student.studentId}</td>
-              <td>{student.vaccinationStatus}</td>
+            <tr key={student.student_id}>
+              <td>{student.first_name} {student.last_name}</td>
               <td>
-                <Link to={`/students/${student.id}/edit`}>Edit</Link>
+                <Link to={`/students/${student.student_id}/edit`}>Edit</Link>
               </td>
             </tr>
           ))}

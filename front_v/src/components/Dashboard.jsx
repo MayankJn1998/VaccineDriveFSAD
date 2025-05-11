@@ -3,27 +3,26 @@ import { Link } from 'react-router-dom';
 
 const Dashboard = () => {
   const [dashboardData, setDashboardData] = useState({
-    totalStudents: 0,
-    vaccinatedStudents: 0,
-    upcomingDrives: [],
+    total_students: 0,
+    vaccinated_students: 0,
+    upcoming_drives: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Simulate fetching dashboard data from an API
-    const fetchData = async () => {
+    const fetchDashboardData = async () => {
       try {
-        // Replace with your actual API call
-        await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate delay
-        const data = {
-          totalStudents: 1000,
-          vaccinatedStudents: 600,
-          upcomingDrives: [
-            { id: 1, date: '2024-03-10', vaccine: 'Vaccine A' },
-            { id: 2, date: '2024-03-20', vaccine: 'Vaccine B' },
-          ],
-        };
+        const token = localStorage.getItem('token');
+        const response = await fetch('http://localhost:5000/schools/1/dashboard', { // Assuming a single school with ID 1 for now
+          headers: {
+            'Authorization': token,
+          },
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
         setDashboardData(data);
       } catch (err) {
         setError(err);
@@ -31,7 +30,8 @@ const Dashboard = () => {
         setLoading(false);
       }
     };
-    fetchData();
+
+    fetchDashboardData();
   }, []);
 
   if (loading) {
@@ -45,22 +45,19 @@ const Dashboard = () => {
   return (
     <div>
       <h2>Dashboard</h2>
-      <p>Total Students: {dashboardData.totalStudents}</p>
+      <p>Total Students: {dashboardData.total_students}</p>
       <p>
-        Vaccinated Students: {dashboardData.vaccinatedStudents} (
-        {(
-          (dashboardData.vaccinatedStudents / dashboardData.totalStudents) *
-          100
-        ).toFixed(2)}
+        Vaccinated Students: {dashboardData.vaccinated_students} (
+        {dashboardData.vaccinated_percentage ? dashboardData.vaccinated_percentage.toFixed(2) : '0'}
         %)
       </p>
       <div>
         <h3>Upcoming Vaccination Drives</h3>
-        {dashboardData.upcomingDrives.length > 0 ? (
+        {dashboardData.upcoming_drives && dashboardData.upcoming_drives.length > 0 ? (
           <ul>
-            {dashboardData.upcomingDrives.map((drive) => (
-              <li key={drive.id}>
-                Date: {drive.date}, Vaccine: {drive.vaccine}
+            {dashboardData.upcoming_drives.map((drive) => (
+              <li key={drive.drive_id}>
+                Date: {new Date(drive.drive_date).toLocaleDateString()}, Vaccine: {drive.vaccine_name}
               </li>
             ))}
           </ul>

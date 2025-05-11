@@ -7,14 +7,18 @@ const VaccinationDriveList = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Simulate fetching vaccination drives from an API
-    const fetchData = async () => {
+    const fetchDrives = async () => {
       try {
-         await new Promise((resolve) => setTimeout(resolve, 1000));
-        const data = [
-          { id: 1, date: '2024-03-10', vaccineName: 'Vaccine A', doses: 100, classes: 'Grades 5-7' },
-          { id: 2, date: '2024-03-20', vaccineName: 'Vaccine B', doses: 150, classes: 'Grades 8-10' },
-        ];
+        const token = localStorage.getItem('token');
+        const response = await fetch('http://localhost:5000/schools/1/vaccination_drives', { // Assuming school ID 1
+          headers: {
+            'Authorization': token,
+          },
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
         setDrives(data);
       } catch (err) {
         setError(err);
@@ -22,7 +26,8 @@ const VaccinationDriveList = () => {
         setLoading(false);
       }
     };
-    fetchData();
+
+    fetchDrives();
   }, []);
 
   if (loading) {
@@ -48,13 +53,13 @@ const VaccinationDriveList = () => {
         </thead>
         <tbody>
           {drives.map((drive) => (
-            <tr key={drive.id}>
-              <td>{drive.date}</td>
-              <td>{drive.vaccineName}</td>
-              <td>{drive.doses}</td>
-              <td>{drive.classes}</td>
+            <tr key={drive.drive_id}>
+              <td>{new Date(drive.drive_date).toLocaleDateString()}</td>
+              <td>{drive.vaccine_name}</td>
+              <td>{drive.available_doses}</td>
+              <td>{drive.applicable_classes}</td>
               <td>
-                <Link to={`/drives/${drive.id}/edit`}>Edit</Link>
+                <Link to={`/drives/${drive.drive_id}/edit`}>Edit</Link>
               </td>
             </tr>
           ))}
