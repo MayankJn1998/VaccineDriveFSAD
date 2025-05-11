@@ -17,7 +17,7 @@ const VaccinationDriveForm = () => {
       const fetchDrive = async () => {
         try {
           const token = localStorage.getItem('token');
-          const response = await fetch(`http://localhost:5000/schools/1/vaccination_drives/${id}`, { // Assuming school ID 1
+          const response = await fetch(`http://localhost:5000/schools/1/drives/${id}`, { // Assuming school ID 1
             headers: {
               'Authorization': token,
             },
@@ -54,7 +54,7 @@ const VaccinationDriveForm = () => {
     try {
       const token = localStorage.getItem('token');
       const method = id ? 'PUT' : 'POST';
-      const url = id ? `http://localhost:5000/schools/1/vaccination_drives/${id}` : 'http://localhost:5000/schools/1/vaccination_drives'; // Assuming school ID 1
+      const url = id ? `http://localhost:5000/schools/1/drives/${id}` : 'http://localhost:5000/schools/1/drives'; // Assuming school ID 1
 
       const response = await fetch(url, {
         method: method,

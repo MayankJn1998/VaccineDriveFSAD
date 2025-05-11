@@ -8,6 +8,7 @@ import StudentForm from './components/StudentForm';
 import VaccinationDriveList from './components/VaccinationDriveList';
 import VaccinationDriveForm from './components/VaccinationDriveForm';
 import ReportGenerator from './components/ReportGenerator';
+import BulkImportStudents from './components/BulkImportStudents';
 
 const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token')); // Check for token
@@ -40,6 +41,7 @@ const App = () => {
         <Route path="/students" element={isLoggedIn ? <StudentList /> : <Login onLogin={handleLogin} />} />
         <Route path="/students/new" element={isLoggedIn ? <StudentForm /> : <Login onLogin={handleLogin} />} />
         <Route path="/students/:id/edit" element={isLoggedIn ? <StudentForm /> : <Login onLogin={handleLogin} />} />
+        <Route path="/students/bulk" element={isLoggedIn ? <BulkImportStudents /> : <Login onLogin={handleLogin} />} />
         <Route path="/drives" element={isLoggedIn ? <VaccinationDriveList /> : <Login onLogin={handleLogin} />} />
         <Route path="/drives/new" element={isLoggedIn ? <VaccinationDriveForm /> : <Login onLogin={handleLogin} />} />
         <Route path="/drives/:id/edit" element={isLoggedIn ? <VaccinationDriveForm /> : <Login onLogin={handleLogin} />} />
